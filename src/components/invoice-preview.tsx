@@ -31,7 +31,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
               INVOICE
             </h1>
             <p className="text-muted-foreground">
-              Invoice Date: {format(data.invoiceDate, "PPP")}
+              Invoice Date: {data.invoiceDate ? format(data.invoiceDate, "PPP") : ''}
             </p>
           </div>
           <div className="text-right">
@@ -48,7 +48,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             </div>
             <div className="text-right">
                 <h3 className="font-semibold mb-1">Delivery Date:</h3>
-                <p>{format(data.deliveryDate, "PPP")}</p>
+                <p>{data.deliveryDate ? format(data.deliveryDate, "PPP"): ''}</p>
             </div>
         </div>
       </CardHeader>
@@ -63,7 +63,10 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
           <TableBody>
             {data.services.map((service, index) => (
               <TableRow key={index}>
-                <TableCell className="font-medium">{service.name}</TableCell>
+                <TableCell className="font-medium">
+                  {service.name}
+                  {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
+                </TableCell>
                 <TableCell className="text-right">₹{Number(service.price).toFixed(2)}</TableCell>
               </TableRow>
             ))}
@@ -83,20 +86,26 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             </TableRow>
           </TableFooter>
         </Table>
-        {(data.measurements || data.notes) && <div className="p-6 border-t">
-          {data.measurements && (
-            <div className="mb-4">
-              <h4 className="font-semibold font-headline mb-2">Measurements:</h4>
-              <p className="text-sm whitespace-pre-wrap">{data.measurements}</p>
-            </div>
-          )}
-          {data.notes && (
-            <div>
-              <h4 className="font-semibold font-headline mb-2">Notes:</h4>
-              <p className="text-sm whitespace-pre-wrap">{data.notes}</p>
-            </div>
-          )}
-        </div>}
+        <div className="p-6 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
+          {data.measurements && data.measurements.length > 0 && (
+              <div>
+                <h4 className="font-semibold font-headline mb-2">Measurements (inches):</h4>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  {data.measurements.map((m, i) => (
+                    <li key={i}>
+                      <span className="font-medium">{m.name}:</span> {m.value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {data.notes && (
+              <div>
+                <h4 className="font-semibold font-headline mb-2">Notes:</h4>
+                <p className="text-sm whitespace-pre-wrap">{data.notes}</p>
+              </div>
+            )}
+        </div>
       </CardContent>
     </Card>
   );

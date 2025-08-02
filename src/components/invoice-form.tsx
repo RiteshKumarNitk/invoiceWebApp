@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import Image from "next/image";
 import {
   CalendarIcon,
   PlusCircle,
@@ -46,6 +47,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { InvoicePreview } from "@/components/invoice-preview";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const steps = [
   {
@@ -56,6 +64,10 @@ const steps = [
   { id: "services", title: "Services", fields: ["services"] },
   { id: "details", title: "Measurements & Notes", fields: ["measurements", "notes", "advance"] },
   { id: "preview", title: "Preview & Send" },
+];
+
+const measurementOptions = [
+  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Sleeve Opening", "Armhole", "Neck Front", "Neck Back"
 ];
 
 export function InvoiceForm() {
@@ -70,17 +82,22 @@ export function InvoiceForm() {
       deliveryDate: new Date(),
       customerName: "",
       customerPhone: "",
-      services: [{ name: "", price: 0 }],
-      measurements: "",
+      services: [{ name: "", description: "", price: 0 }],
+      measurements: [{ name: "Length", value: 0 }],
       notes: "",
       advance: 0,
     },
     mode: "onChange",
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
     control: form.control,
     name: "services",
+  });
+  
+  const { fields: measurementFields, append: appendMeasurement, remove: removeMeasurement } = useFieldArray({
+    control: form.control,
+    name: "measurements",
   });
 
   const watchedServices = form.watch("services");
@@ -286,47 +303,64 @@ BoutiqueBill`;
               <div className="animate-in fade-in-0 duration-500">
                 <FormLabel>Services</FormLabel>
                 <div className="space-y-4 mt-2">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="flex items-center gap-2">
+                  {serviceFields.map((field, index) => (
+                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start p-4 border rounded-md">
                       <FormField
                         control={form.control}
                         name={`services.${index}.name`}
                         render={({ field }) => (
-                          <FormItem className="flex-grow">
+                          <FormItem>
+                             <FormLabel>Service</FormLabel>
                              <FormControl>
-                              <Input placeholder="Service name (e.g. Blouse Stitching)" {...field} />
+                              <Input placeholder="e.g. Blouse Stitching" {...field} />
                             </FormControl>
                              <FormMessage />
                           </FormItem>
                         )}
                       />
-                      <FormField
+                       <FormField
                         control={form.control}
-                        name={`services.${index}.price`}
+                        name={`services.${index}.description`}
                         render={({ field }) => (
-                           <FormItem>
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
                             <FormControl>
-                              <Input
-                                type="number"
-                                placeholder="Price"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                className="w-32"
-                              />
+                              <Input placeholder="e.g. with lining" {...field} />
                             </FormControl>
                             <FormMessage />
-                           </FormItem>
+                          </FormItem>
                         )}
                       />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        disabled={fields.length <= 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <FormField
+                            control={form.control}
+                            name={`services.${index}.price`}
+                            render={({ field }) => (
+                              <FormItem className="flex-grow">
+                                <FormLabel>Price (₹)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    placeholder="Price"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => removeService(index)}
+                            disabled={serviceFields.length <= 1}
+                            className="self-end"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -335,14 +369,14 @@ BoutiqueBill`;
                   variant="outline"
                   size="sm"
                   className="mt-4"
-                  onClick={() => append({ name: "", price: 0 })}
+                  onClick={() => appendService({ name: "", description: "", price: 0 })}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Service
                 </Button>
                  <FormField
                   control={form.control}
                   name="services"
-                  render={({ field }) => (
+                  render={() => (
                     <FormItem>
                        <FormMessage className="mt-2"/>
                     </FormItem>
@@ -352,53 +386,136 @@ BoutiqueBill`;
             )}
             
             {currentStep === 2 && (
-              <div className="grid md:grid-cols-2 gap-6 animate-in fade-in-0 duration-500">
-                <FormField
-                  control={form.control}
-                  name="measurements"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Measurements</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="e.g. Length: 40, Chest: 36, Waist: 30..." {...field} rows={5}/>
-                      </FormControl>
-                       <FormDescription>Optional: Add customer measurement details.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="advance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Advance Paid (₹)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 500"
-                          {...field}
-                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+               <div className="grid md:grid-cols-2 gap-8 animate-in fade-in-0 duration-500">
+                <div>
+                  <FormLabel>Measurements (inches)</FormLabel>
+                  <div className="space-y-4 mt-2">
+                    {measurementFields.map((field, index) => (
+                      <div key={field.id} className="flex items-center gap-2">
+                        <FormField
+                          control={form.control}
+                          name={`measurements.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem className="flex-grow">
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select measurement" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {measurementOptions.map(opt => (
+                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="e.g. Use golden thread..." {...field} />
-                      </FormControl>
-                      <FormDescription>Optional: Any special instructions.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormField
+                          control={form.control}
+                          name={`measurements.${index}.value`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Value"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                  className="w-28"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => removeMeasurement(index)}
+                          disabled={measurementFields.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => appendMeasurement({ name: "Length", value: 0 })}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
+                  </Button>
+                   <FormField
+                      control={form.control}
+                      name="measurements"
+                      render={() => (
+                        <FormItem>
+                          <FormMessage className="mt-2" />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="mt-6">
+                      <FormField
+                        control={form.control}
+                        name="advance"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Advance Paid (₹)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="e.g. 500"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="mt-6">
+                      <FormField
+                        control={form.control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="e.g. Use golden thread..." {...field} />
+                            </FormControl>
+                            <FormDescription>Optional: Any special instructions.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                </div>
+                <div className="flex flex-col items-center">
+                    <Label className="mb-2">Measurement Guide</Label>
+                    <div className="relative w-full max-w-sm">
+                      <Image
+                        src="https://placehold.co/600x800.png"
+                        alt="Blouse measurement guide"
+                        width={300}
+                        height={400}
+                        className="rounded-lg border"
+                        data-ai-hint="blouse measurement diagram"
+                      />
+                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Chest</div>
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded w-20 text-center">Waist</div>
+                      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Shoulder</div>
+                      <div className="absolute top-1/2 left-1/4 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Sleeve</div>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-2 text-center">Visual guide for common blouse measurements.</p>
+                </div>
               </div>
             )}
 
