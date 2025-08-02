@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
@@ -15,6 +15,8 @@ import {
   ArrowRight,
   CheckIcon,
   Ruler,
+  Camera,
+  Upload,
 } from "lucide-react";
 
 import { invoiceSchema, type Invoice } from "@/lib/schemas";
@@ -61,10 +63,13 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogClose
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 
 const steps = [
+  { id: "your-info", title: "Your Details", fields: ["boutiqueName", "boutiqueAddress"] },
   {
     id: "customer-info",
     title: "Customer Info",
@@ -86,26 +91,28 @@ const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
     name: `services.${serviceIndex}.measurements`,
   });
   const serviceName = getValues(`services.${serviceIndex}.name`);
+  const { setValue } = useForm<Invoice>();
+  const [open, setOpen] = useState(false);
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Ruler className="mr-2 h-4 w-4" />
-          Measurements ({fields.length})
+          Measurements ({getValues(`services.${serviceIndex}.measurements`)?.length || 0})
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle>Measurements for {serviceName || 'Service'}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
             <Label>Measurements (inches)</Label>
             <div className="space-y-4 mt-2 max-h-80 overflow-y-auto pr-2">
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-start gap-2">
-                  <FormField
+                  <Controller
                     control={control}
                     name={`services.${serviceIndex}.measurements.${index}.name`}
                     render={({ field }) => (
@@ -126,7 +133,7 @@ const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
                       </FormItem>
                     )}
                   />
-                  <FormField
+                  <Controller
                     control={control}
                     name={`services.${serviceIndex}.measurements.${index}.value`}
                     render={({ field }) => (
@@ -181,14 +188,148 @@ const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
           </div>
         </div>
         <DialogFooter>
-            <DialogTrigger asChild>
-                <Button>Done</Button>
-            </DialogTrigger>
+          <DialogClose asChild>
+            <Button type="button">Done</Button>
+          </DialogClose>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   )
 }
+
+const ImageDialog = ({ serviceIndex }: { serviceIndex: number }) => {
+  const { control, getValues, setValue } = useForm<Invoice>();
+  const [open, setOpen] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(getValues(`services.${serviceIndex}.image`) || null);
+  const { toast } = useToast();
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [hasCameraPermission, setHasCameraPermission] = useState(true);
+  const [isCapturing, setIsCapturing] = useState(false);
+
+  useEffect(() => {
+    if (open && isCapturing) {
+      const getCameraPermission = async () => {
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error('Camera not supported');
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+          }
+          setHasCameraPermission(true);
+        } catch (error) {
+          console.error('Error accessing camera:', error);
+          setHasCameraPermission(false);
+          toast({
+            variant: 'destructive',
+            title: 'Camera Access Denied',
+            description: 'Please enable camera permissions in your browser settings.',
+          });
+          setIsCapturing(false);
+        }
+      };
+      getCameraPermission();
+
+      return () => {
+        const stream = videoRef.current?.srcObject as MediaStream;
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+      }
+    }
+  }, [open, isCapturing, toast]);
+
+  const handleCapture = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg');
+      setImageSrc(dataUrl);
+      setValue(`services.${serviceIndex}.image`, dataUrl);
+      setIsCapturing(false);
+    }
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setImageSrc(dataUrl);
+        setValue(`services.${serviceIndex}.image`, dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDone = () => {
+    setOpen(false);
+    setIsCapturing(false);
+  };
+
+  return (
+     <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Camera className="mr-2 h-4 w-4" />
+          {imageSrc ? 'View Image' : 'Add Image'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Reference Image</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          {isCapturing ? (
+            <div>
+              <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted playsInline />
+              {!hasCameraPermission && (
+                 <Alert variant="destructive" className="mt-2">
+                    <AlertTitle>Camera Access Required</AlertTitle>
+                    <AlertDescription>Please allow camera access to use this feature.</AlertDescription>
+                 </Alert>
+              )}
+              <div className="flex justify-center gap-4 mt-4">
+                  <Button onClick={handleCapture} disabled={!hasCameraPermission}>Capture</Button>
+                  <Button onClick={() => setIsCapturing(false)} variant="outline">Cancel</Button>
+              </div>
+            </div>
+          ) : (
+             <>
+                {imageSrc && (
+                    <div className="relative">
+                        <Image src={imageSrc} alt="Reference" width={400} height={300} className="rounded-md w-full object-contain" />
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => {setImageSrc(null); setValue(`services.${serviceIndex}.image`, undefined)}}>
+                           <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                )}
+                <div className="flex gap-2">
+                    <Button onClick={() => setIsCapturing(true)} className="flex-1">
+                        <Camera className="mr-2 h-4 w-4" /> Use Camera
+                    </Button>
+                    <Button asChild className="flex-1">
+                        <label>
+                            <Upload className="mr-2 h-4 w-4" /> Upload File
+                            <input type="file" accept="image/*" onChange={handleFileUpload} className="sr-only" />
+                        </label>
+                    </Button>
+                </div>
+            </>
+          )}
+        </div>
+        <DialogFooter>
+            <Button onClick={handleDone}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+};
 
 export function InvoiceForm() {
   const [currentStep, setCurrentStep] = useState(0);
@@ -198,6 +339,8 @@ export function InvoiceForm() {
   const form = useForm<Invoice>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
+      boutiqueName: "",
+      boutiqueAddress: "",
       invoiceDate: new Date(),
       deliveryDate: new Date(),
       customerName: "",
@@ -220,7 +363,7 @@ export function InvoiceForm() {
     const currentTotal = watchedForm.services?.reduce((sum, service) => sum + Number(service.price || 0), 0) || 0;
     const currentBalance = currentTotal - Number(watchedForm.advance || 0);
     return { total: currentTotal, balance: currentBalance };
-  }, [watchedForm]);
+  }, [watchedForm.services, watchedForm.advance]);
 
   const generateWhatsappMessage = (data: Invoice) => {
     const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
@@ -232,7 +375,7 @@ export function InvoiceForm() {
 
     return `Hello ${data.customerName},
 
-Here are your order details:
+Here are your order details from ${data.boutiqueName}:
 Services: ${servicesText}
 Total Amount: ₹${currentTotal.toFixed(2)}
 Advance Paid: ₹${Number(data.advance || 0).toFixed(2)}
@@ -241,7 +384,7 @@ Balance Due: ₹${currentBalance.toFixed(2)}
 Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliveryDate, "PPP") : 'a future date'}.
 
 Thank you,
-BoutiqueBill`;
+${data.boutiqueName}`;
   };
   
   useEffect(() => {
@@ -249,11 +392,12 @@ BoutiqueBill`;
       setWhatsappMessage(generateWhatsappMessage(value as Invoice));
     });
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form.watch]);
 
   const nextStep = async () => {
     const fieldsToValidate = steps[currentStep].fields;
-    const isValid = await form.trigger(fieldsToValidate as any);
+    // @ts-ignore
+    const isValid = await form.trigger(fieldsToValidate);
 
     if (isValid) {
       if (currentStep === steps.length - 2) { // When moving to preview
@@ -309,9 +453,39 @@ BoutiqueBill`;
         </div>
       </CardHeader>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => nextStep())}>
+        <form onSubmit={(e) => e.preventDefault()}>
           <CardContent className="space-y-8 py-8">
             {currentStep === 0 && (
+                <div className="grid md:grid-cols-1 gap-6 animate-in fade-in-0 duration-500">
+                     <FormField
+                        control={form.control}
+                        name="boutiqueName"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Boutique Name</FormLabel>
+                            <FormControl>
+                                <Input placeholder="e.g. Anjali's Creations" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                    <FormField
+                        control={form.control}
+                        name="boutiqueAddress"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Boutique Address</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="e.g. 123 Fashion St, New Delhi" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                        />
+                </div>
+            )}
+            {currentStep === 1 && (
               <div className="grid md:grid-cols-2 gap-6 animate-in fade-in-0 duration-500">
                 <FormField
                   control={form.control}
@@ -320,7 +494,7 @@ BoutiqueBill`;
                     <FormItem>
                       <FormLabel>Customer Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Anjali Sharma" {...field} />
+                        <Input placeholder="e.g. Priya Singh" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -420,17 +594,17 @@ BoutiqueBill`;
               </div>
             )}
             
-            {currentStep === 1 && (
+            {currentStep === 2 && (
               <div className="animate-in fade-in-0 duration-500">
                 <FormLabel>Services</FormLabel>
                 <div className="space-y-4 mt-2">
                   {serviceFields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-start p-4 border rounded-md">
+                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start p-4 border rounded-md">
                       <FormField
                         control={form.control}
                         name={`services.${index}.name`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-2">
                              <FormLabel>Service</FormLabel>
                              <FormControl>
                               <Input placeholder="e.g. Blouse Stitching" {...field} />
@@ -443,7 +617,7 @@ BoutiqueBill`;
                         control={form.control}
                         name={`services.${index}.description`}
                         render={({ field }) => (
-                          <FormItem>
+                          <FormItem className="md:col-span-2">
                             <FormLabel>Description</FormLabel>
                             <FormControl>
                               <Input placeholder="e.g. with lining" {...field} />
@@ -470,24 +644,26 @@ BoutiqueBill`;
                             </FormItem>
                           )}
                         />
-                      <div className="flex gap-2 items-end">
-                        <div className="flex-grow">
-                            <FormLabel>Measurements</FormLabel>
-                            <Controller
-                                control={form.control}
-                                name={`services.${index}.measurements`}
-                                render={() => <MeasurementDialog serviceIndex={index} />}
-                            />
-                        </div>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => removeService(index)}
-                            disabled={serviceFields.length <= 1}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                      <div className="flex gap-2 items-end md:col-span-5 justify-end">
+                        <Controller
+                            control={form.control}
+                            name={`services.${index}.measurements`}
+                            render={() => <MeasurementDialog serviceIndex={index} />}
+                        />
+                        <Controller
+                            control={form.control}
+                            name={`services.${index}.image`}
+                            render={() => <ImageDialog serviceIndex={index} />}
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => removeService(index)}
+                          disabled={serviceFields.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
@@ -513,7 +689,7 @@ BoutiqueBill`;
               </div>
             )}
             
-            {currentStep === 2 && (
+            {currentStep === 3 && (
                <div className="grid md:grid-cols-2 gap-8 animate-in fade-in-0 duration-500">
                 <div>
                   <FormField
@@ -571,7 +747,7 @@ BoutiqueBill`;
               </div>
             )}
 
-            {currentStep === 3 && (
+            {currentStep === 4 && (
               <div className="space-y-8 animate-in fade-in-0 duration-500">
                 <div className="invoice-print-area-container">
                   <InvoicePreview data={form.getValues()} total={total} balance={balance} />

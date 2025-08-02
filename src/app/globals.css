@@ -87,13 +87,17 @@
 @media print {
   body {
     background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
   
   .no-print {
     display: none !important;
   }
 
-  .invoice-print-area {
+  .invoice-print-area-container {
+    display: block !important;
     visibility: visible !important;
     position: absolute !important;
     left: 0 !important;
@@ -107,27 +111,23 @@
     box-shadow: none !important;
   }
 
-  main, .max-w-5xl {
-    all: unset;
+  main {
+    all: unset !important;
   }
-  
-  body > * {
+
+  body > div {
     display: none !important;
   }
 
   body > main {
     display: block !important;
   }
-
-  main > .max-w-5xl {
-     display: block !important;
+  
+  main > * {
+     display: none !important;
   }
 
-  .max-w-5xl > * {
-    display: none !important;
-  }
-
-  .max-w-5xl > .invoice-print-area-container {
+  main > .invoice-print-area-container {
     display: block !important;
   }
 }

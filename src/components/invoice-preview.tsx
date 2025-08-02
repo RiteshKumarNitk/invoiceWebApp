@@ -1,6 +1,4 @@
-"use client";
-
-import * as React from "react";
+import React from "react";
 import type { Invoice } from "@/lib/schemas";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -15,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Logo } from "./logo";
 import { Separator } from "./ui/separator";
+import Image from "next/image";
 
 interface InvoicePreviewProps {
   data: Invoice;
@@ -26,7 +25,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
   return (
     <Card className="shadow-none border-border invoice-print-area">
       <CardHeader className="bg-muted/30">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-start">
           <div>
             <h1 className="font-headline text-3xl font-bold text-primary">
               INVOICE
@@ -37,7 +36,8 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
           </div>
           <div className="text-right">
              <Logo className="h-12 w-12 text-primary mx-auto mb-2"/>
-             <h2 className="font-headline font-bold text-xl">BoutiqueBill</h2>
+             <h2 className="font-headline font-bold text-xl">{data.boutiqueName}</h2>
+             <p className="text-sm text-muted-foreground whitespace-pre-line">{data.boutiqueAddress}</p>
           </div>
         </div>
         <Separator className="my-4"/>
@@ -66,8 +66,13 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
               <React.Fragment key={index}>
                 <TableRow>
                   <TableCell className="font-medium align-top">
-                    {service.name}
-                    {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
+                    <div className="flex gap-4">
+                       {service.image && <Image src={service.image} alt="Reference" width={60} height={60} className="rounded-md object-cover"/>}
+                       <div>
+                         <p>{service.name}</p>
+                         {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
+                       </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right align-top">₹{Number(service.price).toFixed(2)}</TableCell>
                 </TableRow>
@@ -75,9 +80,9 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
                   <TableRow>
                     <TableCell colSpan={2} className="py-2 pl-8">
                        <h4 className="font-semibold text-xs mb-1">Measurements (inches):</h4>
-                       <ul className="list-disc list-inside text-xs space-y-1 pl-2">
-                         {service.measurements.map((m, i) => (
-                           m.value > 0 && <li key={i}>
+                       <ul className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                         {service.measurements.filter(m => m.value > 0).map((m, i) => (
+                           <li key={i}>
                              <span className="font-medium">{m.name}:</span> {m.value}
                            </li>
                          ))}
