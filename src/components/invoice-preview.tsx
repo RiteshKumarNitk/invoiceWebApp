@@ -87,7 +87,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
           </TableFooter>
         </Table>
         <div className="p-6 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
-          {data.measurements && data.measurements.length > 0 && data.measurements[0].value > 0 && (
+          {data.measurements && data.measurements.length > 0 && data.measurements.some(m => m.value > 0) && (
               <div>
                 <h4 className="font-semibold font-headline mb-2">Measurements (inches):</h4>
                 <ul className="list-disc list-inside text-sm space-y-1">

@@ -17,7 +17,7 @@ export const invoiceSchema = z.object({
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   deliveryDate: z.date({ required_error: "Delivery date is required." }),
   services: z.array(serviceSchema).min(1, "At least one service is required."),
-  measurements: z.array(measurementSchema),
+  measurements: z.array(measurementSchema).optional(),
   advance: z.coerce.number().min(0, "Advance must be a non-negative number.").optional().default(0),
   notes: z.string().optional(),
 });
