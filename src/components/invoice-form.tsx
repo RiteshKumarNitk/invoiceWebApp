@@ -409,6 +409,8 @@ export function InvoiceForm() {
     defaultValues: {
       boutiqueName: "Anjali's Creations",
       boutiqueAddress: "123 Fashion St, New Delhi",
+      boutiqueLogo: '',
+      boutiqueGst: '',
       invoiceNumber: `INV-${Date.now()}`,
       invoiceDate: new Date(),
       deliveryDate: new Date(new Date().setDate(new Date().getDate() + 7)),
