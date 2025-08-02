@@ -30,15 +30,17 @@ export default function Home() {
       <div className="flex flex-col items-center text-center mb-8 md:mb-12">
         <div className="w-full flex justify-between items-center mb-4">
            <div className="w-1/3"></div>
-           <Logo className="h-16 w-16" />
+           <div className="flex items-center gap-2">
+             <Logo className="h-16 w-16" />
+             <h1 className="font-headline text-4xl md:text-5xl font-bold text-primary">
+                BoutiqueBill
+             </h1>
+           </div>
            <div className="w-1/3 flex justify-end">
             <Button onClick={logout} variant="outline">Logout</Button>
            </div>
         </div>
 
-        <h1 className="font-headline text-4xl md:text-5xl font-bold text-primary">
-          BoutiqueBill
-        </h1>
         <p className="mt-2 text-lg text-muted-foreground max-w-2xl">
           Effortlessly create beautiful invoices for your boutique. Fill in the details, preview, and send to your clients in minutes.
         </p>

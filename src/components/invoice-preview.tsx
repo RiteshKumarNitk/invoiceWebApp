@@ -31,13 +31,20 @@ export const InvoicePreview = React.forwardRef<HTMLDivElement, InvoicePreviewPro
               INVOICE
             </h1>
             <p className="text-muted-foreground">
-              Invoice Date: {data.invoiceDate ? format(data.invoiceDate, "PPP") : ''}
+              Invoice #: {data.invoiceNumber}
+            </p>
+            <p className="text-muted-foreground">
+              Date: {data.invoiceDate ? format(data.invoiceDate, "PPP") : ''}
             </p>
           </div>
           <div className="text-right">
-             <Logo className="h-12 w-12 text-primary mx-auto mb-2"/>
+             {data.boutiqueLogo ? 
+                <Image src={data.boutiqueLogo} alt="Boutique Logo" width={60} height={60} className="rounded-md object-contain ml-auto mb-2" /> :
+                <Logo className="h-12 w-12 text-primary mx-auto mb-2"/>
+             }
              <h2 className="font-headline font-bold text-xl">{data.boutiqueName}</h2>
              <p className="text-sm text-muted-foreground whitespace-pre-line">{data.boutiqueAddress}</p>
+             {data.boutiqueGst && <p className="text-sm text-muted-foreground">GSTIN: {data.boutiqueGst}</p>}
           </div>
         </div>
         <Separator className="my-4"/>

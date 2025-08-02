@@ -17,6 +17,7 @@ import {
   Ruler,
   Camera,
   Upload,
+  ImagePlus
 } from "lucide-react";
 
 import { invoiceSchema, type Invoice } from "@/lib/schemas";
@@ -69,7 +70,7 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 
 const steps = [
-  { id: "your-info", title: "Your Details", fields: ["boutiqueName", "boutiqueAddress"] },
+  { id: "your-info", title: "Your Details", fields: ["boutiqueName", "boutiqueAddress", "boutiqueGst", "invoiceNumber"] },
   {
     id: "customer-info",
     title: "Customer Info",
@@ -83,6 +84,73 @@ const steps = [
 const measurementOptions = [
   "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Sleeve Opening", "Armhole", "Neck Front", "Neck Back", "Kurta Length", "Salwar Length"
 ];
+
+const LogoUploadDialog = ({ setValue, initialImage }: { setValue: any, initialImage?: string }) => {
+  const [open, setOpen] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string | null>(initialImage || null);
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        setImageSrc(dataUrl);
+        setValue('boutiqueLogo', dataUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDone = () => {
+    setOpen(false);
+  };
+  
+  const handleRemoveImage = () => {
+      setImageSrc(null);
+      setValue('boutiqueLogo', undefined);
+  }
+
+  return (
+     <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline">
+          <ImagePlus className="mr-2 h-4 w-4" />
+          {imageSrc ? 'Change Logo' : 'Upload Logo'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Boutique Logo</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+            <>
+                {imageSrc && (
+                    <div className="relative">
+                        <Image src={imageSrc} alt="Boutique Logo" width={400} height={300} className="rounded-md w-full object-contain" />
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={handleRemoveImage}>
+                           <Trash2 className="h-4 w-4"/>
+                        </Button>
+                    </div>
+                )}
+                <div className="flex gap-2">
+                    <Button asChild className="flex-1">
+                        <label>
+                            <Upload className="mr-2 h-4 w-4" /> Upload Logo
+                            <input type="file" accept="image/*" onChange={handleFileUpload} className="sr-only" />
+                        </label>
+                    </Button>
+                </div>
+            </>
+        </div>
+        <DialogFooter>
+            <Button onClick={handleDone}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+};
+
 
 const MeasurementDialog = ({ control, serviceIndex, serviceName }: { control: any, serviceIndex: number, serviceName: string }) => {
   const { fields, append, remove } = useFieldArray({
@@ -341,6 +409,7 @@ export function InvoiceForm() {
     defaultValues: {
       boutiqueName: "Anjali's Creations",
       boutiqueAddress: "123 Fashion St, New Delhi",
+      invoiceNumber: `INV-${Date.now()}`,
       invoiceDate: new Date(),
       deliveryDate: new Date(new Date().setDate(new Date().getDate() + 7)),
       customerName: "",
@@ -352,7 +421,7 @@ export function InvoiceForm() {
     mode: "onChange",
   });
 
-  const { control, getValues, watch } = form;
+  const { control, getValues, watch, setValue } = form;
 
   const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
     control: control,
@@ -471,12 +540,12 @@ ${data.boutiqueName}`;
           <form onSubmit={(e) => e.preventDefault()}>
             <CardContent className="space-y-8 py-8">
               {currentStep === 0 && (
-                  <div className="grid md:grid-cols-1 gap-6 animate-in fade-in-0 duration-500">
+                  <div className="grid md:grid-cols-2 gap-6 animate-in fade-in-0 duration-500">
                       <FormField
                           control={control}
                           name="boutiqueName"
                           render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-2">
                               <FormLabel>Boutique Name</FormLabel>
                               <FormControl>
                                   <Input placeholder="e.g. Anjali's Creations" {...field} />
@@ -489,7 +558,7 @@ ${data.boutiqueName}`;
                           control={control}
                           name="boutiqueAddress"
                           render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="md:col-span-2">
                               <FormLabel>Boutique Address</FormLabel>
                               <FormControl>
                                   <Textarea placeholder="e.g. 123 Fashion St, New Delhi" {...field} />
@@ -497,7 +566,40 @@ ${data.boutiqueName}`;
                               <FormMessage />
                               </FormItem>
                           )}
+                        />
+                         <FormField
+                          control={control}
+                          name="invoiceNumber"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Invoice Number</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="e.g. INV-001" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
                           />
+                        <FormField
+                          control={control}
+                          name="boutiqueGst"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>GST Number (Optional)</FormLabel>
+                              <FormControl>
+                                  <Input placeholder="e.g. 29ABCDE1234F1Z5" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                          <div className="md:col-span-2">
+                              <FormLabel>Boutique Logo</FormLabel>
+                              <div className="mt-2 flex items-center gap-4">
+                                <LogoUploadDialog setValue={setValue} initialImage={getValues('boutiqueLogo')} />
+                                {watch('boutiqueLogo') && <Image src={watch('boutiqueLogo')} alt="Boutique Logo" width={60} height={60} className="rounded-md object-contain border p-1" />}
+                              </div>
+                          </div>
                   </div>
               )}
               {currentStep === 1 && (

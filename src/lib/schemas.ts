@@ -16,6 +16,9 @@ export const serviceSchema = z.object({
 export const invoiceSchema = z.object({
   boutiqueName: z.string().min(2, "Boutique name is required."),
   boutiqueAddress: z.string().min(10, "Boutique address is required."),
+  boutiqueLogo: z.string().optional(),
+  boutiqueGst: z.string().optional(),
+  invoiceNumber: z.string().min(1, "Invoice number is required."),
   customerName: z.string().min(2, "Customer name must be at least 2 characters."),
   customerPhone: z.string().min(10, "A valid phone number is required.").max(15, "Phone number is too long."),
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
