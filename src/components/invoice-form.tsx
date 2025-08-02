@@ -375,8 +375,8 @@ export function InvoiceForm() {
     const servicesText = data.services
         .map(s => {
           let serviceStr = `${s.name}${s.description ? ` (${s.description})` : ''} - ₹${(Number(s.price) || 0).toFixed(2)}`;
-          if (s.measurements && s.measurements.filter(m => m.value > 0).length > 0) {
-            const measurementsText = s.measurements.filter(m => m.value > 0).map(m => `${m.name}: ${m.value}"`).join(', ');
+          if (s.measurements && s.measurements.filter(m => m.value && Number(m.value) > 0).length > 0) {
+            const measurementsText = s.measurements.filter(m => m.value && Number(m.value) > 0).map(m => `${m.name}: ${m.value}"`).join(', ');
             serviceStr += `\n  Measurements: ${measurementsText}`;
           }
           return serviceStr;
@@ -399,13 +399,14 @@ ${data.boutiqueName}`;
   };
   
   const updateWhatsappMessage = () => {
-      setWhatsappMessage(generateWhatsappMessage(getValues()));
+    const data = getValues();
+    setWhatsappMessage(generateWhatsappMessage(data));
   }
 
   useEffect(() => {
     const subscription = watch(() => updateWhatsappMessage());
     return () => subscription.unsubscribe();
-  }, [watch]);
+  }, [watch, getValues]);
 
   const nextStep = async () => {
     const fieldsToValidate = steps[currentStep].fields;
@@ -753,9 +754,6 @@ ${data.boutiqueName}`;
 
               {currentStep === 4 && (
                 <div className="space-y-8 animate-in fade-in-0 duration-500">
-                  <div className="hidden">
-                     <InvoicePreview data={getValues()} total={total} balance={balance} ref-for-print="true" />
-                  </div>
                    <div className="invoice-display-area">
                       <InvoicePreview data={getValues()} total={total} balance={balance} />
                    </div>
@@ -795,11 +793,9 @@ ${data.boutiqueName}`;
           </form>
         </Form>
       </Card>
-      <div className="invoice-print-area-container">
+      <div className="invoice-print-area-container hidden">
         <InvoicePreview data={getValues()} total={total} balance={balance}/>
       </div>
     </>
   );
 }
-
-    
