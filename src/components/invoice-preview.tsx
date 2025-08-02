@@ -23,7 +23,7 @@ interface InvoicePreviewProps {
 
 export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
   return (
-    <Card className="shadow-none border-border">
+    <Card className="shadow-none border-border invoice-print-area">
       <CardHeader className="bg-muted/30">
         <div className="flex justify-between items-center">
           <div>

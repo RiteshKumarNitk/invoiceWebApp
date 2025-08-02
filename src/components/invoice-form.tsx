@@ -114,30 +114,66 @@ export function InvoiceForm() {
   );
 
   useEffect(() => {
-    const data = form.getValues();
-    if (currentStep === 3) {
-      const servicesText = data.services.map(s => `${s.name} (₹${s.price})`).join(', ');
-      const message = `Hello ${data.customerName},
+    const subscription = form.watch((value, { name, type }) => {
+      if (
+        name?.startsWith('services') || 
+        name === 'advance' || 
+        (type === 'change' && currentStep === 3)
+      ) {
+        const data = form.getValues();
+        const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
+        const currentBalance = currentTotal - Number(data.advance || 0);
+
+        const servicesText = data.services
+            .map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`)
+            .join(', ');
+
+        const message = `Hello ${data.customerName},
 
 Here are your order details:
 Services: ${servicesText}
-Total Amount: ₹${total}
-Advance Paid: ₹${data.advance}
-Balance Due: ₹${balance}
+Total Amount: ₹${currentTotal.toFixed(2)}
+Advance Paid: ₹${Number(data.advance || 0).toFixed(2)}
+Balance Due: ₹${currentBalance.toFixed(2)}
 
-Your order will be ready for delivery on ${format(data.deliveryDate, "PPP")}.
+Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliveryDate, "PPP") : 'a future date'}.
 
 Thank you,
 BoutiqueBill`;
-      setWhatsappMessage(message);
-    }
-  }, [currentStep, form, total, balance]);
+        setWhatsappMessage(message);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, currentStep]);
+
+  const triggerPreviewUpdate = () => {
+    const data = form.getValues();
+    const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
+    const currentBalance = currentTotal - Number(data.advance || 0);
+    const servicesText = data.services.map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`).join(', ');
+    const message = `Hello ${data.customerName},
+
+Here are your order details:
+Services: ${servicesText}
+Total Amount: ₹${currentTotal.toFixed(2)}
+Advance Paid: ₹${Number(data.advance || 0).toFixed(2)}
+Balance Due: ₹${currentBalance.toFixed(2)}
+
+Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliveryDate, "PPP"): 'a future date'}.
+
+Thank you,
+BoutiqueBill`;
+    setWhatsappMessage(message);
+  };
 
   const nextStep = async () => {
     const fieldsToValidate = steps[currentStep].fields;
     const isValid = await form.trigger(fieldsToValidate as any);
 
     if (isValid) {
+      if (currentStep === 2) {
+        triggerPreviewUpdate();
+      }
       setCurrentStep((prev) => prev + 1);
     }
   };
@@ -165,7 +201,7 @@ BoutiqueBill`;
   };
 
   return (
-    <Card className="shadow-lg">
+    <Card className="shadow-lg no-print">
       <CardHeader>
         <CardTitle className="font-headline text-2xl md:text-3xl text-center">{steps[currentStep].title}</CardTitle>
         <div className="flex justify-center items-center pt-4">
@@ -521,7 +557,7 @@ BoutiqueBill`;
 
             {currentStep === 3 && (
               <div className="space-y-8 animate-in fade-in-0 duration-500">
-                <div className="invoice-print-area">
+                <div className="invoice-print-area-container">
                   <InvoicePreview data={form.getValues()} total={total} balance={balance} />
                 </div>
                 <div>
