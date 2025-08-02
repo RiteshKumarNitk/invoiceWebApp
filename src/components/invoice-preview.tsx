@@ -62,13 +62,29 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
           </TableHeader>
           <TableBody>
             {data.services.map((service, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-medium">
-                  {service.name}
-                  {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
-                </TableCell>
-                <TableCell className="text-right">₹{Number(service.price).toFixed(2)}</TableCell>
-              </TableRow>
+              <React.Fragment key={index}>
+                <TableRow>
+                  <TableCell className="font-medium align-top">
+                    {service.name}
+                    {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
+                  </TableCell>
+                  <TableCell className="text-right align-top">₹{Number(service.price).toFixed(2)}</TableCell>
+                </TableRow>
+                {service.measurements && service.measurements.some(m => m.value > 0) && (
+                  <TableRow>
+                    <TableCell colSpan={2} className="py-2 pl-8">
+                       <h4 className="font-semibold text-xs mb-1">Measurements (inches):</h4>
+                       <ul className="list-disc list-inside text-xs space-y-1 pl-2">
+                         {service.measurements.map((m, i) => (
+                           m.value > 0 && <li key={i}>
+                             <span className="font-medium">{m.name}:</span> {m.value}
+                           </li>
+                         ))}
+                       </ul>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </React.Fragment>
             ))}
           </TableBody>
           <TableFooter>
@@ -86,26 +102,14 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             </TableRow>
           </TableFooter>
         </Table>
-        <div className="p-6 border-t grid grid-cols-1 md:grid-cols-2 gap-6">
-          {data.measurements && data.measurements.length > 0 && data.measurements.some(m => m.value > 0) && (
-              <div>
-                <h4 className="font-semibold font-headline mb-2">Measurements (inches):</h4>
-                <ul className="list-disc list-inside text-sm space-y-1">
-                  {data.measurements.map((m, i) => (
-                    m.value > 0 && <li key={i}>
-                      <span className="font-medium">{m.name}:</span> {m.value}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {data.notes && (
+        {data.notes && (
+          <div className="p-6 border-t">
               <div>
                 <h4 className="font-semibold font-headline mb-2">Notes:</h4>
                 <p className="text-sm whitespace-pre-wrap">{data.notes}</p>
               </div>
-            )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

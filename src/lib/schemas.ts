@@ -2,13 +2,14 @@ import { z } from "zod";
 
 export const measurementSchema = z.object({
   name: z.string().min(1, "Measurement name is required."),
-  value: z.coerce.number().min(0, "Measurement must be a non-negative number."),
+  value: z.coerce.number().min(0.1, "Measurement must be a positive number."),
 });
 
 export const serviceSchema = z.object({
   name: z.string().min(1, "Service name is required."),
   description: z.string().optional(),
   price: z.coerce.number().min(0, "Price must be a non-negative number."),
+  measurements: z.array(measurementSchema).optional(),
 });
 
 export const invoiceSchema = z.object({
@@ -17,7 +18,6 @@ export const invoiceSchema = z.object({
   invoiceDate: z.date({ required_error: "Invoice date is required." }),
   deliveryDate: z.date({ required_error: "Delivery date is required." }),
   services: z.array(serviceSchema).min(1, "At least one service is required."),
-  measurements: z.array(measurementSchema).optional(),
   advance: z.coerce.number().min(0, "Advance must be a non-negative number.").optional().default(0),
   notes: z.string().optional(),
 });

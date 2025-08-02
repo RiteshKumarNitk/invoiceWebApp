@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import Image from "next/image";
@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckIcon,
+  Ruler,
 } from "lucide-react";
 
 import { invoiceSchema, type Invoice } from "@/lib/schemas";
@@ -53,6 +54,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
 
 const steps = [
   {
@@ -60,14 +70,125 @@ const steps = [
     title: "Customer Info",
     fields: ["customerName", "customerPhone", "invoiceDate", "deliveryDate"],
   },
-  { id: "services", title: "Services", fields: ["services"] },
-  { id: "details", title: "Measurements & Notes", fields: ["measurements", "notes", "advance"] },
+  { id: "services", title: "Services & Measurements", fields: ["services"] },
+  { id: "details", title: "Notes & Payment", fields: ["notes", "advance"] },
   { id: "preview", title: "Preview & Send" },
 ];
 
 const measurementOptions = [
-  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Sleeve Opening", "Armhole", "Neck Front", "Neck Back"
+  "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Sleeve Opening", "Armhole", "Neck Front", "Neck Back", "Kurta Length", "Salwar Length"
 ];
+
+const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
+  const { control, getValues } = useForm<Invoice>();
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `services.${serviceIndex}.measurements`,
+  });
+  const serviceName = getValues(`services.${serviceIndex}.name`);
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm">
+          <Ruler className="mr-2 h-4 w-4" />
+          Measurements ({fields.length})
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-[625px]">
+        <DialogHeader>
+          <DialogTitle>Measurements for {serviceName || 'Service'}</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <Label>Measurements (inches)</Label>
+            <div className="space-y-4 mt-2 max-h-80 overflow-y-auto pr-2">
+              {fields.map((field, index) => (
+                <div key={field.id} className="flex items-start gap-2">
+                  <FormField
+                    control={control}
+                    name={`services.${serviceIndex}.measurements.${index}.name`}
+                    render={({ field }) => (
+                      <FormItem className="flex-grow">
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select measurement" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {measurementOptions.map(opt => (
+                              <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name={`services.${serviceIndex}.measurements.${index}.value`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="Value"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            className="w-24"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="icon"
+                    onClick={() => remove(index)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-4"
+              onClick={() => append({ name: "Length", value: 0 })}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
+            </Button>
+          </div>
+          <div className="flex flex-col items-center">
+            <Label className="mb-2">Measurement Guide</Label>
+            <div className="relative w-full max-w-xs">
+              <Image
+                src="https://placehold.co/600x800.png"
+                alt="Blouse measurement guide"
+                width={250}
+                height={333}
+                className="rounded-lg border"
+                data-ai-hint="blouse measurement diagram"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground mt-2 text-center">Visual guide for common measurements.</p>
+          </div>
+        </div>
+        <DialogFooter>
+            <DialogTrigger asChild>
+                <Button>Done</Button>
+            </DialogTrigger>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export function InvoiceForm() {
   const [currentStep, setCurrentStep] = useState(0);
@@ -81,10 +202,9 @@ export function InvoiceForm() {
       deliveryDate: new Date(),
       customerName: "",
       customerPhone: "",
-      services: [{ name: "", description: "", price: 0 }],
-      measurements: [{ name: "Length", value: 0 }],
-      notes: "",
+      services: [{ name: "", description: "", price: 0, measurements: [] }],
       advance: 0,
+      notes: "",
     },
     mode: "onChange",
   });
@@ -93,42 +213,24 @@ export function InvoiceForm() {
     control: form.control,
     name: "services",
   });
-  
-  const { fields: measurementFields, append: appendMeasurement, remove: removeMeasurement } = useFieldArray({
-    control: form.control,
-    name: "measurements",
-  });
 
-  const watchedServices = form.watch("services");
-  const watchedAdvance = form.watch("advance");
+  const watchedForm = form.watch();
 
-  const total = useMemo(
-    () =>
-      watchedServices.reduce((sum, service) => sum + Number(service.price || 0), 0),
-    [watchedServices]
-  );
+  const { total, balance } = useMemo(() => {
+    const currentTotal = watchedForm.services?.reduce((sum, service) => sum + Number(service.price || 0), 0) || 0;
+    const currentBalance = currentTotal - Number(watchedForm.advance || 0);
+    return { total: currentTotal, balance: currentBalance };
+  }, [watchedForm]);
 
-  const balance = useMemo(
-    () => total - Number(watchedAdvance || 0),
-    [total, watchedAdvance]
-  );
+  const generateWhatsappMessage = (data: Invoice) => {
+    const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
+    const currentBalance = currentTotal - Number(data.advance || 0);
 
-  useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-      if (
-        name?.startsWith('services') || 
-        name === 'advance' || 
-        (type === 'change' && currentStep === 3)
-      ) {
-        const data = form.getValues();
-        const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
-        const currentBalance = currentTotal - Number(data.advance || 0);
+    const servicesText = data.services
+        .map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`)
+        .join(', ');
 
-        const servicesText = data.services
-            .map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`)
-            .join(', ');
-
-        const message = `Hello ${data.customerName},
+    return `Hello ${data.customerName},
 
 Here are your order details:
 Services: ${servicesText}
@@ -140,39 +242,22 @@ Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliv
 
 Thank you,
 BoutiqueBill`;
-        setWhatsappMessage(message);
-      }
+  };
+  
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      setWhatsappMessage(generateWhatsappMessage(value as Invoice));
     });
     return () => subscription.unsubscribe();
-  }, [form, currentStep]);
-
-  const triggerPreviewUpdate = () => {
-    const data = form.getValues();
-    const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
-    const currentBalance = currentTotal - Number(data.advance || 0);
-    const servicesText = data.services.map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`).join(', ');
-    const message = `Hello ${data.customerName},
-
-Here are your order details:
-Services: ${servicesText}
-Total Amount: ₹${currentTotal.toFixed(2)}
-Advance Paid: ₹${Number(data.advance || 0).toFixed(2)}
-Balance Due: ₹${currentBalance.toFixed(2)}
-
-Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliveryDate, "PPP"): 'a future date'}.
-
-Thank you,
-BoutiqueBill`;
-    setWhatsappMessage(message);
-  };
+  }, [form]);
 
   const nextStep = async () => {
     const fieldsToValidate = steps[currentStep].fields;
     const isValid = await form.trigger(fieldsToValidate as any);
 
     if (isValid) {
-      if (currentStep === 2) {
-        triggerPreviewUpdate();
+      if (currentStep === steps.length - 2) { // When moving to preview
+        setWhatsappMessage(generateWhatsappMessage(form.getValues()));
       }
       setCurrentStep((prev) => prev + 1);
     }
@@ -340,7 +425,7 @@ BoutiqueBill`;
                 <FormLabel>Services</FormLabel>
                 <div className="space-y-4 mt-2">
                   {serviceFields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start p-4 border rounded-md">
+                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-4 gap-2 items-start p-4 border rounded-md">
                       <FormField
                         control={form.control}
                         name={`services.${index}.name`}
@@ -367,32 +452,39 @@ BoutiqueBill`;
                           </FormItem>
                         )}
                       />
-                      <div className="flex gap-2">
-                        <FormField
-                            control={form.control}
-                            name={`services.${index}.price`}
-                            render={({ field }) => (
-                              <FormItem className="flex-grow">
-                                <FormLabel>Price (₹)</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    type="number"
-                                    placeholder="Price"
-                                    {...field}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                      <FormField
+                          control={form.control}
+                          name={`services.${index}.price`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Price (₹)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  placeholder="Price"
+                                  {...field}
+                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-grow">
+                            <FormLabel>Measurements</FormLabel>
+                            <Controller
+                                control={form.control}
+                                name={`services.${index}.measurements`}
+                                render={() => <MeasurementDialog serviceIndex={index} />}
+                            />
+                        </div>
                           <Button
                             type="button"
                             variant="destructive"
                             size="icon"
                             onClick={() => removeService(index)}
                             disabled={serviceFields.length <= 1}
-                            className="self-end"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -405,7 +497,7 @@ BoutiqueBill`;
                   variant="outline"
                   size="sm"
                   className="mt-4"
-                  onClick={() => appendService({ name: "", description: "", price: 0 })}
+                  onClick={() => appendService({ name: "", description: "", price: 0, measurements: [] })}
                 >
                   <PlusCircle className="mr-2 h-4 w-4" /> Add Service
                 </Button>
@@ -424,133 +516,57 @@ BoutiqueBill`;
             {currentStep === 2 && (
                <div className="grid md:grid-cols-2 gap-8 animate-in fade-in-0 duration-500">
                 <div>
-                  <FormLabel>Measurements (inches)</FormLabel>
-                  <div className="space-y-4 mt-2">
-                    {measurementFields.map((field, index) => (
-                      <div key={field.id} className="flex items-center gap-2">
-                        <FormField
-                          control={form.control}
-                          name={`measurements.${index}.name`}
-                          render={({ field }) => (
-                            <FormItem className="flex-grow">
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select measurement" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {measurementOptions.map(opt => (
-                                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name={`measurements.${index}.value`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormControl>
-                                <Input
-                                  type="number"
-                                  placeholder="Value"
-                                  {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                  className="w-28"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => removeMeasurement(index)}
-                          disabled={measurementFields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={() => appendMeasurement({ name: "Length", value: 0 })}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Measurement
-                  </Button>
-                   <FormField
+                  <FormField
+                    control={form.control}
+                    name="advance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Advance Paid (₹)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="e.g. 500"
+                            {...field}
+                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="mt-6">
+                    <FormField
                       control={form.control}
-                      name="measurements"
-                      render={() => (
+                      name="notes"
+                      render={({ field }) => (
                         <FormItem>
-                          <FormMessage className="mt-2" />
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="e.g. Use golden thread..." {...field} />
+                          </FormControl>
+                          <FormDescription>Optional: Any special instructions.</FormDescription>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
-                    <div className="mt-6">
-                      <FormField
-                        control={form.control}
-                        name="advance"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Advance Paid (₹)</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                placeholder="e.g. 500"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <div className="mt-6">
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea placeholder="e.g. Use golden thread..." {...field} />
-                            </FormControl>
-                            <FormDescription>Optional: Any special instructions.</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center">
-                    <Label className="mb-2">Measurement Guide</Label>
-                    <div className="relative w-full max-w-sm">
-                      <Image
-                        src="https://placehold.co/600x800.png"
-                        alt="Blouse measurement guide"
-                        width={300}
-                        height={400}
-                        className="rounded-lg border"
-                        data-ai-hint="blouse measurement diagram"
-                      />
-                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Chest</div>
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded w-20 text-center">Waist</div>
-                      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Shoulder</div>
-                      <div className="absolute top-1/2 left-1/4 -translate-x-1/2 bg-black/50 text-white text-xs px-1 rounded">Sleeve</div>
+                <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-4">
+                  <h3 className="text-lg font-semibold mb-2">Summary</h3>
+                  <div className="w-full space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span>Total Amount:</span>
+                      <span className="font-medium">₹{total.toFixed(2)}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2 text-center">Visual guide for common blouse measurements.</p>
+                    <div className="flex justify-between">
+                      <span>Advance Paid:</span>
+                      <span className="font-medium">₹{Number(watchedForm.advance || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold text-primary">
+                      <span>Balance Due:</span>
+                      <span>₹{balance.toFixed(2)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -580,7 +596,6 @@ BoutiqueBill`;
                 </div>
               </div>
             )}
-
           </CardContent>
           <CardFooter className="flex justify-between">
             {currentStep > 0 && (
