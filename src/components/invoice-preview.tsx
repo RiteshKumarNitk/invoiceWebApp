@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import type { Invoice } from "@/lib/schemas";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
