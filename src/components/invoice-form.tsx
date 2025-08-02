@@ -23,7 +23,6 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -105,11 +104,12 @@ export function InvoiceForm() {
 
   const total = useMemo(
     () =>
-      watchedServices.reduce((sum, service) => sum + (Number(service.price) || 0), 0),
+      watchedServices.reduce((sum, service) => sum + Number(service.price || 0), 0),
     [watchedServices]
   );
+
   const balance = useMemo(
-    () => total - (Number(watchedAdvance) || 0),
+    () => total - Number(watchedAdvance || 0),
     [total, watchedAdvance]
   );
 
