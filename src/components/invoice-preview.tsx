@@ -74,9 +74,9 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
                        </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right align-top">₹{Number(service.price).toFixed(2)}</TableCell>
+                  <TableCell className="text-right align-top">₹{Number(service.price || 0).toFixed(2)}</TableCell>
                 </TableRow>
-                {service.measurements && service.measurements.some(m => m.value > 0) && (
+                {service.measurements && service.measurements.filter(m => m.value > 0).length > 0 && (
                   <TableRow>
                     <TableCell colSpan={2} className="py-2 pl-8">
                        <h4 className="font-semibold text-xs mb-1">Measurements (inches):</h4>
