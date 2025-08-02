@@ -85,49 +85,24 @@
 }
 
 @media print {
-  body {
-    background: white !important;
-    color: black !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  body * {
+    visibility: hidden;
+  }
+
+  .invoice-print-area-container, .invoice-print-area-container * {
+    visibility: visible;
   }
   
+  .invoice-print-area-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
   .no-print {
     display: none !important;
   }
-
-  .invoice-print-area-container {
-    display: block !important;
-    visibility: visible !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    float: none !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-
-  main {
-    all: unset !important;
-  }
-
-  body > div {
-    display: none !important;
-  }
-
-  body > main {
-    display: block !important;
-  }
-  
-  main > * {
-     display: none !important;
-  }
-
-  main > .invoice-print-area-container {
-    display: block !important;
-  }
 }
+
+    

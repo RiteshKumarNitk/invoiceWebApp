@@ -84,22 +84,19 @@ const measurementOptions = [
   "Length", "Chest", "Waist", "Hip", "Shoulder", "Sleeve Length", "Sleeve Opening", "Armhole", "Neck Front", "Neck Back", "Kurta Length", "Salwar Length"
 ];
 
-const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
-  const { control, getValues } = useForm<Invoice>();
+const MeasurementDialog = ({ control, serviceIndex, serviceName }: { control: any, serviceIndex: number, serviceName: string }) => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: `services.${serviceIndex}.measurements`,
   });
-  const serviceName = getValues(`services.${serviceIndex}.name`);
-  const { setValue } = useForm<Invoice>();
   const [open, setOpen] = useState(false);
-
+  
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           <Ruler className="mr-2 h-4 w-4" />
-          Measurements ({getValues(`services.${serviceIndex}.measurements`)?.length || 0})
+          Measurements ({fields.length})
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
@@ -143,7 +140,6 @@ const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
                             type="number"
                             placeholder="Value"
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                             className="w-24"
                           />
                         </FormControl>
@@ -197,10 +193,9 @@ const MeasurementDialog = ({ serviceIndex }: { serviceIndex: number }) => {
   )
 }
 
-const ImageDialog = ({ serviceIndex }: { serviceIndex: number }) => {
-  const { control, getValues, setValue } = useForm<Invoice>();
+const ImageDialog = ({ setValue, serviceIndex, initialImage }: { setValue: any, serviceIndex: number, initialImage?: string }) => {
   const [open, setOpen] = useState(false);
-  const [imageSrc, setImageSrc] = useState<string | null>(getValues(`services.${serviceIndex}.image`) || null);
+  const [imageSrc, setImageSrc] = useState<string | null>(initialImage || null);
   const { toast } = useToast();
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -271,6 +266,11 @@ const ImageDialog = ({ serviceIndex }: { serviceIndex: number }) => {
     setOpen(false);
     setIsCapturing(false);
   };
+  
+  const handleRemoveImage = () => {
+      setImageSrc(null);
+      setValue(`services.${serviceIndex}.image`, undefined);
+  }
 
   return (
      <Dialog open={open} onOpenChange={setOpen}>
@@ -304,7 +304,7 @@ const ImageDialog = ({ serviceIndex }: { serviceIndex: number }) => {
                 {imageSrc && (
                     <div className="relative">
                         <Image src={imageSrc} alt="Reference" width={400} height={300} className="rounded-md w-full object-contain" />
-                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={() => {setImageSrc(null); setValue(`services.${serviceIndex}.image`, undefined)}}>
+                        <Button variant="destructive" size="icon" className="absolute top-2 right-2 h-6 w-6" onClick={handleRemoveImage}>
                            <Trash2 className="h-4 w-4"/>
                         </Button>
                     </div>
@@ -339,10 +339,10 @@ export function InvoiceForm() {
   const form = useForm<Invoice>({
     resolver: zodResolver(invoiceSchema),
     defaultValues: {
-      boutiqueName: "",
-      boutiqueAddress: "",
+      boutiqueName: "Anjali's Creations",
+      boutiqueAddress: "123 Fashion St, New Delhi",
       invoiceDate: new Date(),
-      deliveryDate: new Date(),
+      deliveryDate: new Date(new Date().setDate(new Date().getDate() + 7)),
       customerName: "",
       customerPhone: "",
       services: [{ name: "", description: "", price: 0, measurements: [] }],
@@ -352,33 +352,44 @@ export function InvoiceForm() {
     mode: "onChange",
   });
 
+  const { control, getValues, watch } = form;
+
   const { fields: serviceFields, append: appendService, remove: removeService } = useFieldArray({
-    control: form.control,
+    control: control,
     name: "services",
   });
 
-  const watchedForm = form.watch();
+  const watchedServices = watch("services");
+  const watchedAdvance = watch("advance");
 
   const { total, balance } = useMemo(() => {
-    const currentTotal = watchedForm.services?.reduce((sum, service) => sum + Number(service.price || 0), 0) || 0;
-    const currentBalance = currentTotal - Number(watchedForm.advance || 0);
+    const currentTotal = watchedServices.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
+    const currentBalance = currentTotal - (Number(watchedAdvance) || 0);
     return { total: currentTotal, balance: currentBalance };
-  }, [watchedForm.services, watchedForm.advance]);
+  }, [watchedServices, watchedAdvance]);
 
   const generateWhatsappMessage = (data: Invoice) => {
-    const currentTotal = data.services.reduce((sum, service) => sum + Number(service.price || 0), 0);
-    const currentBalance = currentTotal - Number(data.advance || 0);
+    const currentTotal = data.services.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
+    const currentBalance = currentTotal - (Number(data.advance) || 0);
 
     const servicesText = data.services
-        .map(s => `${s.name} (₹${Number(s.price || 0).toFixed(2)})`)
-        .join(', ');
+        .map(s => {
+          let serviceStr = `${s.name}${s.description ? ` (${s.description})` : ''} - ₹${(Number(s.price) || 0).toFixed(2)}`;
+          if (s.measurements && s.measurements.filter(m => m.value > 0).length > 0) {
+            const measurementsText = s.measurements.filter(m => m.value > 0).map(m => `${m.name}: ${m.value}"`).join(', ');
+            serviceStr += `\n  Measurements: ${measurementsText}`;
+          }
+          return serviceStr;
+        })
+        .join('\n');
 
     return `Hello ${data.customerName},
 
 Here are your order details from ${data.boutiqueName}:
-Services: ${servicesText}
+${servicesText}
+
 Total Amount: ₹${currentTotal.toFixed(2)}
-Advance Paid: ₹${Number(data.advance || 0).toFixed(2)}
+Advance Paid: ₹${(Number(data.advance) || 0).toFixed(2)}
 Balance Due: ₹${currentBalance.toFixed(2)}
 
 Your order will be ready for delivery on ${data.deliveryDate ? format(data.deliveryDate, "PPP") : 'a future date'}.
@@ -387,12 +398,14 @@ Thank you,
 ${data.boutiqueName}`;
   };
   
+  const updateWhatsappMessage = () => {
+      setWhatsappMessage(generateWhatsappMessage(getValues()));
+  }
+
   useEffect(() => {
-    const subscription = form.watch((value) => {
-      setWhatsappMessage(generateWhatsappMessage(value as Invoice));
-    });
+    const subscription = watch(() => updateWhatsappMessage());
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [watch]);
 
   const nextStep = async () => {
     const fieldsToValidate = steps[currentStep].fields;
@@ -401,7 +414,7 @@ ${data.boutiqueName}`;
 
     if (isValid) {
       if (currentStep === steps.length - 2) { // When moving to preview
-        setWhatsappMessage(generateWhatsappMessage(form.getValues()));
+        updateWhatsappMessage();
       }
       setCurrentStep((prev) => prev + 1);
     }
@@ -416,7 +429,7 @@ ${data.boutiqueName}`;
   };
 
   const handleWhatsApp = () => {
-    const phone = form.getValues("customerPhone");
+    const phone = getValues("customerPhone");
     if (!phone) {
       toast({
         variant: "destructive",
@@ -430,363 +443,363 @@ ${data.boutiqueName}`;
   };
 
   return (
-    <Card className="shadow-lg no-print">
-      <CardHeader>
-        <CardTitle className="font-headline text-2xl md:text-3xl text-center">{steps[currentStep].title}</CardTitle>
-        <div className="flex justify-center items-center pt-4">
-          {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <div
-                className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
-                  currentStep > index ? "bg-primary text-primary-foreground" :
-                  currentStep === index ? "bg-accent text-accent-foreground" : "bg-muted"
-                )}
-              >
-                {currentStep > index ? <CheckIcon className="w-5 h-5" /> : index + 1}
-              </div>
-              {index < steps.length - 1 && (
-                <div className={cn("w-12 h-1 transition-colors", currentStep > index ? "bg-primary" : "bg-muted")} />
-              )}
-            </div>
-          ))}
-        </div>
-      </CardHeader>
-      <Form {...form}>
-        <form onSubmit={(e) => e.preventDefault()}>
-          <CardContent className="space-y-8 py-8">
-            {currentStep === 0 && (
-                <div className="grid md:grid-cols-1 gap-6 animate-in fade-in-0 duration-500">
-                     <FormField
-                        control={form.control}
-                        name="boutiqueName"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Boutique Name</FormLabel>
-                            <FormControl>
-                                <Input placeholder="e.g. Anjali's Creations" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
-                    <FormField
-                        control={form.control}
-                        name="boutiqueAddress"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Boutique Address</FormLabel>
-                            <FormControl>
-                                <Textarea placeholder="e.g. 123 Fashion St, New Delhi" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                        />
+    <>
+      <Card className="shadow-lg no-print">
+        <CardHeader>
+          <CardTitle className="font-headline text-2xl md:text-3xl text-center">{steps[currentStep].title}</CardTitle>
+          <div className="flex justify-center items-center pt-4">
+            {steps.map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div
+                  className={cn(
+                    "flex items-center justify-center w-8 h-8 rounded-full transition-colors",
+                    currentStep > index ? "bg-primary text-primary-foreground" :
+                    currentStep === index ? "bg-accent text-accent-foreground" : "bg-muted"
+                  )}
+                >
+                  {currentStep > index ? <CheckIcon className="w-5 h-5" /> : index + 1}
                 </div>
-            )}
-            {currentStep === 1 && (
-              <div className="grid md:grid-cols-2 gap-6 animate-in fade-in-0 duration-500">
-                <FormField
-                  control={form.control}
-                  name="customerName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Priya Singh" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="customerPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Customer Phone (with country code)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. 919876543210" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="invoiceDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Invoice Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="deliveryDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Delivery Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant={"outline"}
-                              className={cn(
-                                "pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            disabled={(date) => date < new Date()}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {index < steps.length - 1 && (
+                  <div className={cn("w-12 h-1 transition-colors", currentStep > index ? "bg-primary" : "bg-muted")} />
+                )}
               </div>
-            )}
-            
-            {currentStep === 2 && (
-              <div className="animate-in fade-in-0 duration-500">
-                <FormLabel>Services</FormLabel>
-                <div className="space-y-4 mt-2">
-                  {serviceFields.map((field, index) => (
-                    <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start p-4 border rounded-md">
+            ))}
+          </div>
+        </CardHeader>
+        <Form {...form}>
+          <form onSubmit={(e) => e.preventDefault()}>
+            <CardContent className="space-y-8 py-8">
+              {currentStep === 0 && (
+                  <div className="grid md:grid-cols-1 gap-6 animate-in fade-in-0 duration-500">
                       <FormField
-                        control={form.control}
-                        name={`services.${index}.name`}
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                             <FormLabel>Service</FormLabel>
-                             <FormControl>
-                              <Input placeholder="e.g. Blouse Stitching" {...field} />
-                            </FormControl>
-                             <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                       <FormField
-                        control={form.control}
-                        name={`services.${index}.description`}
-                        render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel>Description</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g. with lining" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                          control={form.control}
-                          name={`services.${index}.price`}
+                          control={control}
+                          name="boutiqueName"
                           render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Price (₹)</FormLabel>
+                              <FormItem>
+                              <FormLabel>Boutique Name</FormLabel>
                               <FormControl>
-                                <Input
-                                  type="number"
-                                  placeholder="Price"
-                                  {...field}
-                                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                />
+                                  <Input placeholder="e.g. Anjali's Creations" {...field} />
                               </FormControl>
                               <FormMessage />
-                            </FormItem>
+                              </FormItem>
                           )}
-                        />
-                      <div className="flex gap-2 items-end md:col-span-5 justify-end">
-                        <Controller
-                            control={form.control}
-                            name={`services.${index}.measurements`}
-                            render={() => <MeasurementDialog serviceIndex={index} />}
-                        />
-                        <Controller
-                            control={form.control}
-                            name={`services.${index}.image`}
-                            render={() => <ImageDialog serviceIndex={index} />}
-                        />
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => removeService(index)}
-                          disabled={serviceFields.length <= 1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => appendService({ name: "", description: "", price: 0, measurements: [] })}
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Service
-                </Button>
-                 <FormField
-                  control={form.control}
-                  name="services"
-                  render={() => (
-                    <FormItem>
-                       <FormMessage className="mt-2"/>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-            
-            {currentStep === 3 && (
-               <div className="grid md:grid-cols-2 gap-8 animate-in fade-in-0 duration-500">
-                <div>
+                          />
+                      <FormField
+                          control={control}
+                          name="boutiqueAddress"
+                          render={({ field }) => (
+                              <FormItem>
+                              <FormLabel>Boutique Address</FormLabel>
+                              <FormControl>
+                                  <Textarea placeholder="e.g. 123 Fashion St, New Delhi" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                              </FormItem>
+                          )}
+                          />
+                  </div>
+              )}
+              {currentStep === 1 && (
+                <div className="grid md:grid-cols-2 gap-6 animate-in fade-in-0 duration-500">
                   <FormField
-                    control={form.control}
-                    name="advance"
+                    control={control}
+                    name="customerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Advance Paid (₹)</FormLabel>
+                        <FormLabel>Customer Name</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="e.g. 500"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                          />
+                          <Input placeholder="e.g. Priya Singh" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <div className="mt-6">
+                  <FormField
+                    control={control}
+                    name="customerPhone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Customer Phone (with country code)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 919876543210" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name="invoiceDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Invoice Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name="deliveryDate"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Delivery Date</FormLabel>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn(
+                                  "pl-3 text-left font-normal",
+                                  !field.value && "text-muted-foreground"
+                                )}
+                              >
+                                {field.value ? (
+                                  format(field.value, "PPP")
+                                ) : (
+                                  <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value}
+                              onSelect={field.onChange}
+                              disabled={(date) => date < new Date()}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              
+              {currentStep === 2 && (
+                <div className="animate-in fade-in-0 duration-500">
+                  <FormLabel>Services</FormLabel>
+                  <div className="space-y-4 mt-2">
+                    {serviceFields.map((field, index) => (
+                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-start p-4 border rounded-md">
+                        <FormField
+                          control={control}
+                          name={`services.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Service</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. Blouse Stitching" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={control}
+                          name={`services.${index}.description`}
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Description</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. with lining" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                            control={control}
+                            name={`services.${index}.price`}
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (₹)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    placeholder="Price"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        <div className="flex gap-2 items-end md:col-span-5 justify-end">
+                          <MeasurementDialog control={control} serviceIndex={index} serviceName={watch(`services.${index}.name`)} />
+                          <ImageDialog setValue={form.setValue} serviceIndex={index} initialImage={getValues(`services.${index}.image`)} />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => removeService(index)}
+                            disabled={serviceFields.length <= 1}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => appendService({ name: "", description: "", price: 0, measurements: [] })}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                  </Button>
+                  <FormField
+                    control={control}
+                    name="services"
+                    render={() => (
+                      <FormItem>
+                        <FormMessage className="mt-2"/>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              
+              {currentStep === 3 && (
+                <div className="grid md:grid-cols-2 gap-8 animate-in fade-in-0 duration-500">
+                  <div>
                     <FormField
-                      control={form.control}
-                      name="notes"
+                      control={control}
+                      name="advance"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Notes</FormLabel>
+                          <FormLabel>Advance Paid (₹)</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="e.g. Use golden thread..." {...field} />
+                            <Input
+                              type="number"
+                              placeholder="e.g. 500"
+                              {...field}
+                            />
                           </FormControl>
-                          <FormDescription>Optional: Any special instructions.</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+                    <div className="mt-6">
+                      <FormField
+                        control={control}
+                        name="notes"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Notes</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="e.g. Use golden thread..." {...field} />
+                            </FormControl>
+                            <FormDescription>Optional: Any special instructions.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-2">Summary</h3>
+                    <div className="w-full space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Total Amount:</span>
+                        <span className="font-medium">₹{total.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Advance Paid:</span>
+                        <span className="font-medium">₹{(Number(watchedAdvance) || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-base font-bold text-primary">
+                        <span>Balance Due:</span>
+                        <span>₹{balance.toFixed(2)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-center justify-center bg-muted/50 rounded-lg p-4">
-                  <h3 className="text-lg font-semibold mb-2">Summary</h3>
-                  <div className="w-full space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Total Amount:</span>
-                      <span className="font-medium">₹{total.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Advance Paid:</span>
-                      <span className="font-medium">₹{Number(watchedForm.advance || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-base font-bold text-primary">
-                      <span>Balance Due:</span>
-                      <span>₹{balance.toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+              )}
 
-            {currentStep === 4 && (
-              <div className="space-y-8 animate-in fade-in-0 duration-500">
-                <div className="invoice-print-area-container">
-                  <InvoicePreview data={form.getValues()} total={total} balance={balance} />
+              {currentStep === 4 && (
+                <div className="space-y-8 animate-in fade-in-0 duration-500">
+                  <div className="hidden">
+                     <InvoicePreview data={getValues()} total={total} balance={balance} ref-for-print="true" />
+                  </div>
+                   <div className="invoice-display-area">
+                      <InvoicePreview data={getValues()} total={total} balance={balance} />
+                   </div>
+                  <div>
+                    <Label htmlFor="whatsapp-message">WhatsApp Message</Label>
+                    <Textarea 
+                        id="whatsapp-message"
+                        value={whatsappMessage}
+                        onChange={(e) => setWhatsappMessage(e.target.value)}
+                        rows={10}
+                        className="mt-2"
+                      />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <Button type="button" onClick={handlePrint} size="lg" variant="outline" className="w-full sm:w-auto">
+                          <Printer className="mr-2 h-5 w-5" /> Print / Save PDF
+                      </Button>
+                      <Button type="button" onClick={handleWhatsApp} size="lg" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
+                          <Send className="mr-2 h-5 w-5" /> Send via WhatsApp
+                      </Button>
+                  </div>
                 </div>
-                <div>
-                   <Label htmlFor="whatsapp-message">WhatsApp Message</Label>
-                   <Textarea 
-                      id="whatsapp-message"
-                      value={whatsappMessage}
-                      onChange={(e) => setWhatsappMessage(e.target.value)}
-                      rows={8}
-                      className="mt-2"
-                    />
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Button type="button" onClick={handlePrint} size="lg" variant="outline" className="w-full sm:w-auto">
-                        <Printer className="mr-2 h-5 w-5" /> Print / Save PDF
-                    </Button>
-                    <Button type="button" onClick={handleWhatsApp} size="lg" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
-                        <Send className="mr-2 h-5 w-5" /> Send via WhatsApp
-                    </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            {currentStep > 0 && (
-              <Button type="button" onClick={prevStep} variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-              </Button>
-            )}
-            {currentStep < steps.length - 1 && (
-              <Button type="button" onClick={nextStep} className="ml-auto">
-                Next <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            )}
-          </CardFooter>
-        </form>
-      </Form>
-    </Card>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              {currentStep > 0 && (
+                <Button type="button" onClick={prevStep} variant="outline">
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+              )}
+              {currentStep < steps.length - 1 && (
+                <Button type="button" onClick={nextStep} className="ml-auto">
+                  Next <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </CardFooter>
+          </form>
+        </Form>
+      </Card>
+      <div className="invoice-print-area-container">
+        <InvoicePreview data={getValues()} total={total} balance={balance}/>
+      </div>
+    </>
   );
 }
+
+    

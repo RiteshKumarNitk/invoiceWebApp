@@ -21,9 +21,9 @@ interface InvoicePreviewProps {
   balance: number;
 }
 
-export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
+export const InvoicePreview = React.forwardRef<HTMLDivElement, InvoicePreviewProps>(({ data, total, balance }, ref) => {
   return (
-    <Card className="shadow-none border-border invoice-print-area">
+    <Card className="shadow-none border-border" ref={ref}>
       <CardHeader className="bg-muted/30">
         <div className="flex justify-between items-start">
           <div>
@@ -69,19 +69,19 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
                     <div className="flex gap-4">
                        {service.image && <Image src={service.image} alt="Reference" width={60} height={60} className="rounded-md object-cover"/>}
                        <div>
-                         <p>{service.name}</p>
+                         <p className="font-bold">{service.name}</p>
                          {service.description && <p className="text-xs text-muted-foreground">{service.description}</p>}
                        </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right align-top">₹{Number(service.price || 0).toFixed(2)}</TableCell>
+                  <TableCell className="text-right align-top">₹{(Number(service.price) || 0).toFixed(2)}</TableCell>
                 </TableRow>
-                {service.measurements && service.measurements.filter(m => m.value > 0).length > 0 && (
+                {service.measurements && service.measurements.filter(m => m.value && Number(m.value) > 0).length > 0 && (
                   <TableRow>
                     <TableCell colSpan={2} className="py-2 pl-8">
                        <h4 className="font-semibold text-xs mb-1">Measurements (inches):</h4>
                        <ul className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1 text-xs">
-                         {service.measurements.filter(m => m.value > 0).map((m, i) => (
+                         {service.measurements.filter(m => m.value && Number(m.value) > 0).map((m, i) => (
                            <li key={i}>
                              <span className="font-medium">{m.name}:</span> {m.value}
                            </li>
@@ -100,7 +100,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             </TableRow>
             <TableRow>
               <TableCell>Advance Paid</TableCell>
-              <TableCell className="text-right">₹{Number(data.advance || 0).toFixed(2)}</TableCell>
+              <TableCell className="text-right">₹{(Number(data.advance) || 0).toFixed(2)}</TableCell>
             </TableRow>
             <TableRow className="text-lg font-bold text-primary bg-muted/50">
               <TableCell>Balance Due</TableCell>
@@ -119,4 +119,8 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
       </CardContent>
     </Card>
   );
-}
+});
+
+InvoicePreview.displayName = "InvoicePreview"
+
+    
