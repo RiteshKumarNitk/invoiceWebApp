@@ -64,7 +64,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             {data.services.map((service, index) => (
               <TableRow key={index}>
                 <TableCell className="font-medium">{service.name}</TableCell>
-                <TableCell className="text-right">₹{service.price.toFixed(2)}</TableCell>
+                <TableCell className="text-right">₹{Number(service.price).toFixed(2)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -75,7 +75,7 @@ export function InvoicePreview({ data, total, balance }: InvoicePreviewProps) {
             </TableRow>
             <TableRow>
               <TableCell>Advance Paid</TableCell>
-              <TableCell className="text-right">₹{(data.advance || 0).toFixed(2)}</TableCell>
+              <TableCell className="text-right">₹{Number(data.advance || 0).toFixed(2)}</TableCell>
             </TableRow>
             <TableRow className="text-lg font-bold text-primary bg-muted/50">
               <TableCell>Balance Due</TableCell>

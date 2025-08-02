@@ -12,6 +12,7 @@ import {
   Printer,
   ArrowLeft,
   ArrowRight,
+  CheckIcon,
 } from "lucide-react";
 
 import { invoiceSchema, type Invoice } from "@/lib/schemas";
@@ -87,11 +88,11 @@ export function InvoiceForm() {
 
   const total = useMemo(
     () =>
-      watchedServices.reduce((sum, service) => sum + (service.price || 0), 0),
+      watchedServices.reduce((sum, service) => sum + (Number(service.price) || 0), 0),
     [watchedServices]
   );
   const balance = useMemo(
-    () => total - (watchedAdvance || 0),
+    () => total - (Number(watchedAdvance) || 0),
     [total, watchedAdvance]
   );
 
@@ -305,7 +306,13 @@ BoutiqueBill`;
                         render={({ field }) => (
                            <FormItem>
                             <FormControl>
-                              <Input type="number" placeholder="Price" {...field} className="w-32" />
+                              <Input
+                                type="number"
+                                placeholder="Price"
+                                {...field}
+                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                className="w-32"
+                              />
                             </FormControl>
                             <FormMessage />
                            </FormItem>
@@ -367,7 +374,12 @@ BoutiqueBill`;
                     <FormItem>
                       <FormLabel>Advance Paid (₹)</FormLabel>
                       <FormControl>
-                        <Input type="number" placeholder="e.g. 500" {...field} />
+                        <Input
+                          type="number"
+                          placeholder="e.g. 500"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -432,24 +444,5 @@ BoutiqueBill`;
         </form>
       </Form>
     </Card>
-  );
-}
-
-function CheckIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
   );
 }
