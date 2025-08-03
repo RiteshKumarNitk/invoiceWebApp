@@ -5,6 +5,8 @@ import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import Image from "next/image";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import {
   CalendarIcon,
   PlusCircle,
@@ -17,7 +19,8 @@ import {
   Ruler,
   Camera,
   Upload,
-  ImagePlus
+  ImagePlus,
+  Loader2,
 } from "lucide-react";
 
 import { invoiceSchema, type Invoice } from "@/lib/schemas";
@@ -401,6 +404,7 @@ const ImageDialog = ({ setValue, serviceIndex, initialImage }: { setValue: any, 
 
 export function InvoiceForm() {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [whatsappMessage, setWhatsappMessage] = useState("");
   const { toast } = useToast();
 
@@ -496,8 +500,63 @@ ${data.boutiqueName}`;
     setCurrentStep((prev) => prev - 1);
   };
   
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    setIsDownloading(true);
+    const invoiceElement = document.querySelector(".invoice-print-area-container .invoice-display-area") as HTMLElement;
+
+    if (!invoiceElement) {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not find invoice to download.",
+        });
+        setIsDownloading(false);
+        return;
+    }
+
+    try {
+        const canvas = await html2canvas(invoiceElement, {
+            scale: 2, // Higher scale for better quality
+            useCORS: true,
+            allowTaint: true,
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const pdf = new jsPDF({
+            orientation: "p",
+            unit: "mm",
+            format: "a4",
+        });
+
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+        const ratio = canvasWidth / canvasHeight;
+        
+        let imgWidth = pdfWidth - 20; // with margin
+        let imgHeight = imgWidth / ratio;
+
+        if (imgHeight > pdfHeight - 20) {
+            imgHeight = pdfHeight - 20;
+            imgWidth = imgHeight * ratio;
+        }
+
+        const x = (pdfWidth - imgWidth) / 2;
+        const y = 10; // top margin
+
+        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+        pdf.save(`invoice-${getValues("invoiceNumber")}.pdf`);
+    } catch (error) {
+        console.error("Error generating PDF:", error);
+        toast({
+            variant: "destructive",
+            title: "PDF Generation Failed",
+            description: "An error occurred while creating the PDF file.",
+        });
+    } finally {
+        setIsDownloading(false);
+    }
   };
 
   const handleWhatsApp = () => {
@@ -872,8 +931,9 @@ ${data.boutiqueName}`;
                       />
                   </div>
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                      <Button type="button" onClick={handlePrint} size="lg" variant="outline" className="w-full sm:w-auto">
-                          <Printer className="mr-2 h-5 w-5" /> Print / Save PDF
+                      <Button type="button" onClick={handlePrint} size="lg" variant="outline" className="w-full sm:w-auto" disabled={isDownloading}>
+                          {isDownloading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Printer className="mr-2 h-5 w-5" />}
+                          {isDownloading ? "Downloading..." : "Download PDF"}
                       </Button>
                       <Button type="button" onClick={handleWhatsApp} size="lg" className="w-full sm:w-auto bg-green-500 hover:bg-green-600">
                           <Send className="mr-2 h-5 w-5" /> Send via WhatsApp
@@ -898,7 +958,9 @@ ${data.boutiqueName}`;
         </Form>
       </Card>
       <div className="invoice-print-area-container hidden">
-        <InvoicePreview data={getValues()} total={total} balance={balance}/>
+        <div className="invoice-display-area">
+            <InvoicePreview data={getValues()} total={total} balance={balance}/>
+        </div>
       </div>
     </>
   );
