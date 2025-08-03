@@ -965,5 +965,3 @@ ${data.boutiqueName}`;
     </>
   );
 }
-
-    
