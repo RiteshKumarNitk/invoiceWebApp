@@ -521,7 +521,7 @@ ${data.boutiqueName}`;
             allowTaint: true,
         });
 
-        const imgData = canvas.toDataURL("image/png");
+        const imgData = canvas.toDataURL("image/jpeg", 1.0);
         const pdf = new jsPDF({
             orientation: "p",
             unit: "mm",
@@ -545,7 +545,7 @@ ${data.boutiqueName}`;
         const x = (pdfWidth - imgWidth) / 2;
         const y = 10; // top margin
 
-        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
         pdf.save(`invoice-${getValues("invoiceNumber")}.pdf`);
     } catch (error) {
         console.error("Error generating PDF:", error);
