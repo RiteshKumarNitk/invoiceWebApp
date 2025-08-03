@@ -521,6 +521,10 @@ ${data.boutiqueName}`;
             allowTaint: true,
         });
 
+        if (canvas.width === 0 || canvas.height === 0) {
+          throw new Error("Canvas has zero dimensions.");
+        }
+
         const imgData = canvas.toDataURL("image/jpeg", 1.0);
         const pdf = new jsPDF({
             orientation: "p",
@@ -530,29 +534,30 @@ ${data.boutiqueName}`;
 
         const pdfWidth = pdf.internal.pageSize.getWidth();
         const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
         
-        let imgWidth = pdfWidth - 20; // with margin
-        let imgHeight = imgWidth / ratio;
+        const imgProps= pdf.getImageProperties(imgData);
+        const imgWidth = pdfWidth - 20; // 10mm margin on each side
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
+        let finalImgHeight = imgHeight;
+        let finalImgWidth = imgWidth;
+        
         if (imgHeight > pdfHeight - 20) {
-            imgHeight = pdfHeight - 20;
-            imgWidth = imgHeight * ratio;
+            finalImgHeight = pdfHeight - 20; // 10mm margin on top/bottom
+            finalImgWidth = (imgWidth * finalImgHeight) / imgHeight;
         }
 
-        const x = (pdfWidth - imgWidth) / 2;
-        const y = 10; // top margin
+        const x = (pdfWidth - finalImgWidth) / 2;
+        const y = 10;
 
-        pdf.addImage(imgData, "JPEG", x, y, imgWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", x, y, finalImgWidth, finalImgHeight);
         pdf.save(`invoice-${getValues("invoiceNumber")}.pdf`);
     } catch (error) {
         console.error("Error generating PDF:", error);
         toast({
             variant: "destructive",
             title: "PDF Generation Failed",
-            description: "An error occurred while creating the PDF file.",
+            description: "An error occurred while creating the PDF file. Please try again.",
         });
     } finally {
         setIsDownloading(false);
