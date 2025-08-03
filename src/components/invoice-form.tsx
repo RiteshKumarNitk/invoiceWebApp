@@ -516,7 +516,7 @@ ${data.boutiqueName}`;
 
     try {
         const canvas = await html2canvas(invoiceElement, {
-            scale: 2, // Higher scale for better quality
+            scale: 2,
             useCORS: true,
             allowTaint: true,
         });
@@ -965,3 +965,5 @@ ${data.boutiqueName}`;
     </>
   );
 }
+
+    
